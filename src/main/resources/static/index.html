@@ -3,41 +3,74 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Warehouse DOM – Zentrale</title>
+  <title>Warehouse – Zentrale</title>
   <style>
-    body { font-family: system-ui, sans-serif; margin: 2rem; background: #f7f7f9; color: #1d1d1f; }
-    h1 { font-size: 1.5rem; }
-    .controls { margin: 1rem 0; display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; }
-    select, input, button { padding: .45rem .6rem; font-size: .9rem; border: 1px solid #ccc; border-radius: 6px; }
-    button { background: #0a84ff; color: #fff; border: none; cursor: pointer; }
-    button:hover { background: #0060df; }
-    table { border-collapse: collapse; width: 100%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.1); }
-    th, td { padding: .5rem .7rem; text-align: left; border-bottom: 1px solid #eee; font-size: .88rem; }
-    th { background: #f0f0f3; position: sticky; top: 0; }
-    tr:hover { background: #fafafa; }
-    .meta { color: #666; font-size: .8rem; }
-    .summary { margin: .5rem 0; font-weight: 600; }
+    :root {
+      --bg: #f5f6f8;
+      --surface: #ffffff;
+      --border: #e2e4e9;
+      --text: #1c1e21;
+      --muted: #6b7280;
+      --accent: #1f6feb;
+      --accent-hover: #195bc4;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      margin: 0; padding: 2.5rem 2rem; background: var(--bg); color: var(--text);
+    }
+    .wrap { max-width: 1100px; margin: 0 auto; }
+    h1 { font-size: 1.35rem; font-weight: 600; margin: 0 0 1.75rem; }
+    .controls {
+      display: flex; gap: .75rem; flex-wrap: wrap; align-items: flex-end;
+      margin-bottom: 1.25rem;
+    }
+    label { display: flex; flex-direction: column; gap: .3rem; font-size: .78rem; color: var(--muted); }
+    select, input {
+      padding: .5rem .65rem; font-size: .9rem; color: var(--text);
+      border: 1px solid var(--border); border-radius: 6px; background: var(--surface); min-width: 11rem;
+    }
+    input[type=number] { min-width: 8rem; }
+    select:focus, input:focus { outline: none; border-color: var(--accent); }
+    button {
+      padding: .55rem 1rem; font-size: .88rem; font-weight: 500;
+      border: 1px solid var(--border); border-radius: 6px; cursor: pointer;
+      background: var(--surface); color: var(--text);
+    }
+    button:hover { border-color: var(--accent); color: var(--accent); }
+    button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+    button.primary:hover { background: var(--accent-hover); color: #fff; }
+    .summary { margin: 0 0 .75rem; font-size: .82rem; color: var(--muted); }
+    table {
+      border-collapse: collapse; width: 100%; background: var(--surface);
+      border: 1px solid var(--border); border-radius: 8px; overflow: hidden;
+    }
+    th, td { padding: .6rem .8rem; text-align: left; font-size: .86rem; }
+    th { background: #f0f1f4; color: var(--muted); font-weight: 600; position: sticky; top: 0; }
+    td { border-top: 1px solid var(--border); }
+    tbody tr:hover { background: #f8f9fb; }
+    .meta { color: var(--muted); }
   </style>
 </head>
 <body>
-  <h1>📦 Document Oriented Middleware – Zentrale</h1>
-  <p class="meta">Daten aller Lagerstandorte aus dem zentralen MongoDB-Repository.</p>
+  <div class="wrap">
+    <h1>Warehouse – Zentrale</h1>
 
-  <div class="controls">
-    <label>Lagerstandort:
-      <select id="warehouse"><option value="">– alle –</option></select>
-    </label>
-    <label>Kategorie:
-      <select id="category"><option value="">– alle –</option></select>
-    </label>
-    <label>Max. Bestand:
-      <input id="maxqty" type="number" placeholder="z.B. 100" style="width:7rem">
-    </label>
-    <button onclick="load()">Anzeigen</button>
-    <button onclick="loadWarehouses()">Übersicht Lager</button>
-  </div>
+    <div class="controls">
+      <label>Lagerstandort
+        <select id="warehouse"><option value="">Alle</option></select>
+      </label>
+      <label>Kategorie
+        <select id="category"><option value="">Alle</option></select>
+      </label>
+      <label>Max. Bestand
+        <input id="maxqty" type="number" placeholder="z.B. 100">
+      </label>
+      <button class="primary" onclick="load()">Anzeigen</button>
+      <button onclick="loadWarehouses()">Übersicht</button>
+    </div>
 
-  <div class="summary" id="summary"></div>
+    <div class="summary" id="summary"></div>
   <table>
     <thead>
       <tr>
@@ -47,6 +80,7 @@
     </thead>
     <tbody id="rows"></tbody>
   </table>
+  </div>
 
 <script>
 const API = '';
