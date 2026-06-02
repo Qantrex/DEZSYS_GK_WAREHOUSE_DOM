@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Warehouse DOM – Zentrale</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 2rem; background: #f7f7f9; color: #1d1d1f; }
+    h1 { font-size: 1.5rem; }
+    .controls { margin: 1rem 0; display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; }
+    select, input, button { padding: .45rem .6rem; font-size: .9rem; border: 1px solid #ccc; border-radius: 6px; }
+    button { background: #0a84ff; color: #fff; border: none; cursor: pointer; }
+    button:hover { background: #0060df; }
+    table { border-collapse: collapse; width: 100%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.1); }
+    th, td { padding: .5rem .7rem; text-align: left; border-bottom: 1px solid #eee; font-size: .88rem; }
+    th { background: #f0f0f3; position: sticky; top: 0; }
+    tr:hover { background: #fafafa; }
+    .meta { color: #666; font-size: .8rem; }
+    .summary { margin: .5rem 0; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <h1>📦 Document Oriented Middleware – Zentrale</h1>
+  <p class="meta">Daten aller Lagerstandorte aus dem zentralen MongoDB-Repository.</p>
+
+  <div class="controls">
+    <label>Lagerstandort:
+      <select id="warehouse"><option value="">– alle –</option></select>
+    </label>
+    <label>Kategorie:
+      <select id="category"><option value="">– alle –</option></select>
+    </label>
+    <label>Max. Bestand:
+      <input id="maxqty" type="number" placeholder="z.B. 100" style="width:7rem">
+    </label>
+    <button onclick="load()">Anzeigen</button>
+    <button onclick="loadWarehouses()">Übersicht Lager</button>
+  </div>
+
+  <div class="summary" id="summary"></div>
+  <table>
+    <thead>
+      <tr>
+        <th>Lager</th><th>Stadt</th><th>ProduktID</th><th>Produkt</th>
+        <th>Kategorie</th><th>Bestand</th><th>Zeitstempel</th>
+      </tr>
+    </thead>
+    <tbody id="rows"></tbody>
+  </table>
+
+<script>
+const API = '';
+
+async function fillFilters() {
+  const products = await (await fetch(API + '/product')).json();
+  const cats = [...new Set(products.map(p => p.productCategory))].sort();
+  const whs  = [...new Set(products.map(p => p.warehouseID))].sort();
+  const catSel = document.getElementById('category');
+  const whSel  = document.getElementById('warehouse');
+  cats.forEach(c => catSel.add(new Option(c, c)));
+  whs.forEach(w => {
+    const name = products.find(p => p.warehouseID === w)?.warehouseName || w;
+    whSel.add(new Option(`${w} – ${name}`, w));
+  });
+}
+
+function render(data) {
+  const tbody = document.getElementById('rows');
+  tbody.innerHTML = '';
+  data.forEach(p => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${p.warehouseID ?? ''}</td><td>${p.warehouseCity ?? ''}</td>
+      <td>${p.productID ?? ''}</td><td>${p.productName ?? ''}</td>
+      <td>${p.productCategory ?? ''}</td><td>${p.productQuantity ?? ''}</td>
+      <td class="meta">${(p.timestamp ?? '').toString().replace('T',' ').slice(0,19)}</td>`;
+    tbody.appendChild(tr);
+  });
+  document.getElementById('summary').textContent = `${data.length} Einträge`;
+}
+
+async function load() {
+  const wh = document.getElementById('warehouse').value;
+  const cat = document.getElementById('category').value;
+  const max = document.getElementById('maxqty').value;
+  let data;
+  if (wh)        data = await (await fetch(`${API}/warehouse/${wh}`)).json();
+  else if (cat)  data = await (await fetch(`${API}/report/category?name=${encodeURIComponent(cat)}`)).json();
+  else if (max)  data = await (await fetch(`${API}/report/lowstock?max=${max}`)).json();
+  else           data = await (await fetch(`${API}/product`)).json();
+
+  if (cat) data = data.filter(p => p.productCategory === cat);
+  if (max) data = data.filter(p => p.productQuantity <= Number(max));
+  render(data);
+}
+
+async function loadWarehouses() {
+  const data = await (await fetch(`${API}/warehouse`)).json();
+  const tbody = document.getElementById('rows');
+  tbody.innerHTML = '';
+  data.forEach(w => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${w.warehouseID}</td><td>${w.warehouseCity}</td>
+      <td colspan="2">${w.warehouseName}</td><td>Produkte: ${w.productCount}</td>
+      <td colspan="2">Gesamtbestand: ${w.totalQuantity}</td>`;
+    tbody.appendChild(tr);
+  });
+  document.getElementById('summary').textContent = `${data.length} Lagerstandorte`;
+}
+
+fillFilters().then(load);
+</script>
+</body>
+</html>

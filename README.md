@@ -1,174 +1,423 @@
-# Middleware Engineering "Document Oriented Middleware using MongoDB" - Taskdescription
-GIT repository: [https://github.com/ThomasMicheler/DEZSYS_GK_WAREHOUSE_DOM.git](https://github.com/ThomasMicheler/DEZSYS_GK_WAREHOUSE_DOM.git)
+# Document Oriented Middleware – Warehouse (MongoDB)
 
-## Einführung
+Zentrale dokumentenorientierte Middleware mit **Spring Boot + Spring Data MongoDB**.
+Die Daten aller Lagerstandorte werden über ein REST-Interface entgegengenommen und im
+JSON-Format in einem zentralen MongoDB-Repository persistiert. Von dort können sie für
+verschiedene Fragestellungen des Betriebes (Management, Einkauf, Vertrieb) abgefragt werden.
 
-Diese Übung soll helfen die Funktionsweise und Einsatzmöglichkeiten eines dokumentenorientierten dezentralen Systems mit Hilfe des Frameworks Spring Data MongoDB oder einem Framework Ihrer Wahl zu demonstrieren. Die Daten werden in dieser Übung in einem NoSQL Repository gespeichert und verarbeitet.
+> Die Original-Angabe befindet sich in [`ANGABE.md`](ANGABE.md) bzw. [`TASK.md`](TASK.md).
 
-Es handelt sich um ein Lagerstandort Beispiel, wie in Aufgabe "GK8.1 Spring Data and ORM". Die Daten aller Lagerstandorte sollen in der Zentrale persistiert und in einer NoSQL Datenbank gespeichert werden. Von hier aus koennen die Daten fuer verschiedene Fragestellungen des Betriebes (Management, Einkauf, Vertrieb,...) abgefragt werden.
+## Setup
 
-## 1.1 Ziele
+### Start
 
-Das Ziel dieser Übung ist die Implementierung einer dokumentenorientierten Middleware, die die Daten aller Warenlager zentral in einem entsprechenden Format ablegt.
+```bash
+# MongoDB (Docker)
+docker pull mongo
+docker run -d -p 27017:27017 --name mongo mongo   # oder: docker start mongo
 
-## 1.2 Voraussetzungen
+# Application
+./gradlew clean bootRun
+```
 
-* Grundlagen zu JSON & REST
-* Grundlagen Architektur von verteilten Systemen
-* Grundlagen Spring Framework, Spring Boot oae.
-* Grundlagen NoSQL
-* Installation MongoDB
-* Datenstruktur basierend auf der Aufgabenstellung "GK8.1 Spring Data and ORM"
-* Umsetzung eines einfachen Web-Userinterfaces zur Anzeige von Daten
+Beim Start befüllt die mitgelieferte Client-Applikation das Repository automatisch über
+die REST-Schnittstelle (siehe Code-Snippet 4): **36 Produkte in 5 Kategorien** an
+**3 Lagerstandorten** = **108 Lagerbestands-Einträge**.
 
+Web-UI zur Anzeige der Daten: <http://localhost:8080/>
 
-## 1.3 Aufgabenstellung
+### Stop
 
-Implementieren Sie eine dokumentenorientierte Middleware mit Hilfe von MongoDB, dass Daten über eine REST Schnittstellen empfängt und die Daten des Lagerstandortes in einer MongoDB Datenbank im JSON Format abspeichert. Entwerfen Sie eine geeignet Datenstruktur, um eine kontinuierliche Speicherung der Daten zu gewährleisten.
+```bash
+# Application: Ctrl+C im bootRun-Terminal
+# MongoDB
+docker stop mongo
+```
 
-Es sollen dabei folgende REST-Funktionen implementiert werden:  
+### Mongo Shell
 
-* POST /warehouse: fügt einen neuen Lagerstandort hinzu. 
-* GET /warehouse: abrufen aller Lagerstandorte und deren Lagerbestand  
-* GET /warehouse/{id}: abrufen eines Lagerstandortes id und dessen Lagerbestand  
-* DELETE /warehouse/{id}: löschen eines Lagerstandortes id   
+```bash
+docker exec -it mongo mongosh
+use test
+db.productData.find()
+```
 
-* POST /product: fügt ein neues Produkt und dessen Lagerbestand zu einem Lagerstandort hinzu
-* GET /product: abrufen aller Produkte/Lagerbestand und deren Lagerstandort
-* GET /product/{id}: abrufen eines Produktes id und dessen Lagerstandorte
-* DELETE /product/{id}: löschen eines Produktes id auf einem Lagerstandort
+---
 
-Das Format und in welchen Zeitabständen die Daten eintreffen wird von Ihnen, als System Architekt, spezifiziert und implementiert.
+## How to Use
 
-Die Daten werden in der Zentrale in einem MongoDB Repository gespeichert und können hier zu Kontrollzwecken abgerufen werden (mongo Shell).
+### Datenstruktur (ein Dokument der Collection `productData`)
 
-## 1.4 Demo Applikation
+```json
+{
+  "_id": "6a1eb768e5404267d41c7700",
+  "warehouseID": "1",
+  "warehouseName": "Linz Bahnhof",
+  "warehouseCity": "Linz",
+  "productID": "00-443175",
+  "productName": "Bio Orangensaft Sonne",
+  "productCategory": "Getraenk",
+  "productQuantity": 1130.0,
+  "timestamp": "2026-06-02T12:58:48.288"
+}
+```
 
-* Download Docker for MongoDB  
-  `docker pull mongo`  
+Die Struktur ist bewusst **denormalisiert** (Lager-Metadaten liegen an jedem Produkt-Eintrag).
+Das ist der typische NoSQL-Ansatz und erlaubt Filtern/Aggregieren über Lager **und** Produkte
+in einer einzigen Collection ohne Joins. Mehrere Lagerstandorte werden über `warehouseID`
+abgebildet; der `timestamp` stellt sicher, dass keine Daten verloren gehen.
 
-* Run Docker for MongoDB (using port 27017, name mongo)  
-  `docker run -d -p 27017:27017 --name mongo mongo`  
+### Endpoints
 
-* Run MongoShell on Docker Instance  
-  `docker exec -it mongo bash`  
-  `mongosh`  
+| Method | URL | Beschreibung |
+|--------|-----|--------------|
+| `POST` | `http://localhost:8080/product` | Produkt/Lagerbestand zu einem Lager hinzufügen |
+| `GET` | `http://localhost:8080/product` | Alle Produkte inkl. Lagerstandort |
+| `GET` | `http://localhost:8080/product/{id}` | Ein Produkt (productID) über alle Lagerstandorte |
+| `DELETE` | `http://localhost:8080/product/{id}` | Produkt auf allen Lagerstandorten löschen |
+| `POST` | `http://localhost:8080/warehouse` | Lagerbestands-Eintrag hinzufügen |
+| `GET` | `http://localhost:8080/warehouse` | Alle Lagerstandorte + Bestands-Übersicht |
+| `GET` | `http://localhost:8080/warehouse/{id}` | Ein Lagerstandort + dessen Lagerbestand |
+| `DELETE` | `http://localhost:8080/warehouse/{id}` | Lagerstandort löschen |
+| `GET` | `http://localhost:8080/report/category?name=Getraenk` | Produkte einer Kategorie |
+| `GET` | `http://localhost:8080/report/lowstock?max=100` | Produkte mit Bestand ≤ max |
+| `POST` | `http://localhost:8080/admin/reset` | Repository mit Testdaten neu befüllen |
 
-* Execute MongoShell Commands    
-  `show dbs`  
-  `use local`   
-  `db.startup_log.countDocuments();`    
+### CLI Testing
 
-* Accessing Data with MongoDB and Spring  
-  - Build and Run Example  
-	  `gradle clean bootRun`  
+```bash
+# Alle Lagerstandorte (Übersicht mit Produktanzahl + Gesamtbestand)
+curl http://localhost:8080/warehouse
 
-  - Check Data in MongoDB.  
-    `docker exec -it mongo bash`
-    `mongosh`
-    `use test`
-    `db.warehouseData.find()`  
+# Lagerstandort 1 mit komplettem Lagerbestand
+curl http://localhost:8080/warehouse/1
 
-## 1.5 Bewertung  
+# Ein Produkt über alle Lagerstandorte
+curl http://localhost:8080/product/00-443175
 
-*   Gruppengrösse: 1 Person
-*   Abgabemodus: per Protokoll und Abgabespraech
-*   Grundlagen Anforderungen **"Grundlagen"**
-    * Installation und Konfiguration einer dokumentenorientierten Middleware mit einem Framework Ihrer Wahl und MongoDB
-    * Entwurf und Umsetzung einer entsprechenden JSON Datenstruktur
-    * Speicherung der Daten von nur einem Lagerstandort
-    * Speicherung der Daten in einer MongoDB Datenbank in der Zentrale
-        - mindestens 10 Produkte in 3 Produktkategorien
-    * REST API:
-        - POST /product, GET /product, GET /warehouse
-    * Beantwortung der Fragestellungen   
-    * 5 CRUD Operationen über Mongo Shell
-      Dokumentieren Sie den Mongo Shell Befehl und dessen Ergebnis.
-      Beispiel: ein Produkt hinzufügen, ein Produkt löschen, ein Produkt ändern, ...
-*   Erweiterte Anforderungen **"Erweiterte Grundlagen"**
-    * Erweiterung der Datenstruktur, sodass ein Speicherung der Daten von mehreren Lagerstandorten möglich ist.
-    * REST API: Implementierung der gesamten Schnittstelle, wie in der Angabe beschrieben
-    * Implementieren Sie eine kleine Applikation, dass die Daten generiert und über das REST-Interfaces dieser Übung abspeichert.
-      Dabei werden sowohl Produkte, als auch Lagerstandorte abgelegt.
-*   Erweiterte Anforderungen **"Vertiefung"**
-    * Generieren Testdaten für das Berichtswesen: mind. 300 Produkte in 6 Produktkategorien, 5 Warenhaeuser   
-    * Formulierung 3 sinnvoller Fragestellungen für das Berichtswesen in der Zentrale und deren Abfragen in einer Mongo Shell.
-      Beispiel:
-      Wie ist der Lagerbestand von einem Produkt X über alle Lagerstandorte?
-      Welche Produkte haben einen Lagerbestand von unter 10 Stück über alle Lagerstandorte?
-    * Implementieren Sie eine Schnittstelle zu einer AI Instanz (lokal Ollama, cloud-basiert Gemini), um die Daten zu übertragen und lassen Sie sich zu den 3 Fragestellungen einen Bericht / Grafik von der AI entwerfen. Dokumentieren Sie hier die Anfragen, die Ihre Applikation an die AI Instanz sendet.
+# Neues Produkt zu einem Lager hinzufügen (POST)
+curl -X POST http://localhost:8080/product \
+  -H "Content-Type: application/json" \
+  -d '{"warehouseID":"1","warehouseName":"Linz Bahnhof","warehouseCity":"Linz",
+       "productID":"99-999999","productName":"Test Produkt",
+       "productCategory":"Getraenk","productQuantity":42}'
 
-## 1.6 Fragestellung für Protokoll
+# Produkt löschen (DELETE)
+curl -X DELETE http://localhost:8080/product/99-999999
 
-+ Nennen Sie 4 Vorteile eines NoSQL Repository im Gegensatz zu einem relationalen DBMS
-+ Nennen Sie 4 Nachteile eines NoSQL Repository im Gegensatz zu einem relationalen DBMS
-+ Welche Schwierigkeiten ergeben sich bei der Zusammenführung der Daten?
-+ Welche Arten von NoSQL Datenbanken gibt es?
-+ Nennen Sie einen Vertreter für jede Art?
-+ Beschreiben Sie die Abkürzungen CA, CP und AP in Bezug auf das CAP Theorem
-+ Mit welchem Befehl koennen Sie den Lagerstand eines Produktes aller Lagerstandorte anzeigen.
-+ Mit welchem Befehl koennen Sie den Lagerstand eines Produktes eines bestimmten Lagerstandortes anzeigen.
+# Reporting: Produkte unter 100 Stück
+curl "http://localhost:8080/report/lowstock?max=100"
 
-## 1.7 Links und Dokumente
-* [Was bedeutet NoSQL](https://www.oracle.com/at/database/nosql/what-is-nosql)
-* [Accessing Data with MongoDB](https://spring.io/guides/gs/accessing-data-mongodb/)
-* [MongoDB Installation](https://docs.mongodb.com/manual/administration/install-community/)
-* [mongo Shell Quick Reference](https://docs.mongodb.com/manual/reference/mongo-shell/)
-* [mongo Shell Query Reference](https://www.mongodb.com/docs/manual/tutorial/query-embedded-documents/)
-* [Grundlagen Spring Framework](https://spring.io/)
-* [Spring Boot](https://spring.io/guides/gs/spring-boot/)
-* [Spring Data MongoDB](https://spring.io/projects/spring-data-mongodb)
-* [Spring RESTful Web Service](https://spring.io/guides/gs/rest-service/#use-maven)
-* NoSQL Introduction
-  - [NoSQL on w3resource](https://www.w3resource.com/mongodb/nosql.php)  
-  - [Introduction to NoSQL Database](https://www.edureka.co/blog/introduction-to-nosql-database/)  
-  - [NoSQL im Überblick](https://www.heise.de/ct/artikel/NoSQL-im-Ueberblick-1012483.html)  
-  - [Introduction to NoSQL Databases on YouTube ](https://www.youtube.com/watch?v=2yQ9TGFpDuM)  
+# Repository neu befüllen
+curl -X POST http://localhost:8080/admin/reset
+```
 
+---
 
-## 1.8 Mongo Shell Abfragen  
-  
-Link to [Mongo Shell Query and Projection Operators](https://docs.mongodb.com/manual/reference/operator/query/)
+## Code Snippets
 
-Den Demo-Abfragen liegt folgende Datenstruktur zu Grunde:   
-   `{  `  
-   `    warehouseID: '1',   `   
-   `    warehouseName: 'Linz Bahnhof',   `   
-   `   timestamp: '2022-01-02 01:00:00',   `   
-   `    warehousePostalCode: 4010,`    
-   `   warehouseCity: 'Linz',`   
-   `   warehouseCountrz: 'Austria',`   
-   `   productData: [`  
-   `      { productID: '00-443175', productName: 'Bio Orangensaft Sonne', productQuantity: 2500 },`    
-   `      { productID: '00-871895', productName: 'Bio Apfelsaft Gold', productQuantity: 3420 },`    
-   `      { productID: '01-926885', productName: 'Ariel Waschmittel Color', productQuantity: 478 },`     
-   `   ]`   
-    `}`
-  
-* Filtern nach dem Lagerstandort 1    
-`db.productData.find( { 
-	"warehouseID": "1"
-} )`
+### 1 – MongoDB-Dokument (`@Document`)
 
+```java
+// ProductData.java
+@Document(collection = "productData")
+public class ProductData {
+    @Id
+    private String ID;
+    private String warehouseID;
+    private String productID;
+    private double productQuantity;
+    private LocalDateTime timestamp;
+    // ...
+}
+```
 
-* Filtern nach Lagerstandort 1 und dem Produkt mit dem Namen "Bio Apfelsaft Gold"  
-`db.productData.find( { 
-	"warehouseID": "1",
-        "productName": "Bio Apfelsaft Gold"
-} )`
+`@Document` legt die Ziel-Collection fest, `@Id` markiert den von MongoDB generierten
+Primärschlüssel (`_id`). Im Gegensatz zu JPA gibt es keine fixen Tabellen-Schemata –
+jedes Dokument trägt seine Felder selbst.
 
-* Filtern nach allen Produkten, die einen Lagerbestand unter 500 Stueck haben.  
-`db.productData.find( { 
-	"productQuantity": { $lte: 500 }
-} )`
+---
 
-* Filtern nach Lagerstandort 1 und einem Lagerbestand unter 500 Stueck haben.  
-`db.productData.find( { 
-    "warehouseID": "1",
-    "productQuantity": { $lte: 500 }
-} )`
+### 2 – Abgeleitete Query-Methoden im Repository
 
-* Filtern nach allen Produkten der Produktkategorien.  
-`db.productData.find( { 
-     productCategory: { $in: [ "Waschmittel", "Getraenk" ] } 
-} )`
+```java
+// WarehouseRepository.java
+public interface WarehouseRepository extends MongoRepository<ProductData, String> {
+    List<ProductData> findByProductID(String productID);
+    List<ProductData> findByWarehouseID(String warehouseID);
+    List<ProductData> findByProductCategory(String productCategory);
+    List<ProductData> findByProductQuantityLessThanEqual(double threshold);
+}
+```
+
+Spring Data MongoDB erzeugt die MongoDB-Query automatisch aus dem Methodennamen –
+`findByProductQuantityLessThanEqual` wird z.B. zu `{ productQuantity: { $lte: ... } }`.
+
+---
+
+### 3 – REST-Controller (vollständige Schnittstelle)
+
+```java
+@RestController
+@CrossOrigin(origins = "*")
+public class WarehouseController {
+    @PostMapping("/product")            // C
+    public ProductData addProduct(@RequestBody ProductData p) { return service.addProduct(p); }
+
+    @GetMapping("/product/{id}")        // R – ein Produkt über alle Lager
+    public List<ProductData> getProduct(@PathVariable String id) { return service.getProductById(id); }
+
+    @DeleteMapping("/warehouse/{id}")   // D – ganzen Lagerstandort entfernen
+    public ResponseEntity<String> deleteWarehouse(@PathVariable String id) { ... }
+}
+```
+
+`@RestController` serialisiert Rückgabewerte automatisch zu JSON; `@RequestBody`
+deserialisiert eingehendes JSON zu einem `ProductData`-Objekt.
+
+---
+
+### 4 – Client-Applikation: Daten generieren & über REST speichern
+
+```java
+// WarehouseDataClient.java  ("Erweiterte Grundlagen")
+@EventListener(ApplicationReadyEvent.class)
+public void seedViaRest() {
+    clearAllWarehouses();                       // DELETE /warehouse/{id}
+    for (ProductData entry : generator.generateAll()) {
+        restTemplate.postForObject(baseUrl() + "/product", entry, ProductData.class); // POST
+    }
+}
+```
+
+Eine kleine In-Process-Applikation generiert den kompletten Datensatz und legt ihn –
+bewusst **über die REST-Schnittstelle** (nicht direkt im Repository) – ab. Das
+demonstriert den vollständigen Round-Trip *Generator → REST → MongoDB*.
+
+---
+
+### 5 – application.properties (MongoDB-Verbindung)
+
+```properties
+spring.data.mongodb.uri=${MONGO_URI:mongodb://localhost:27017/test}
+spring.data.mongodb.database=${MONGO_DB:test}
+server.port=8080
+warehouse.client.seed-on-startup=true
+warehouse.scheduler.enabled=false
+```
+
+Die Syntax `${VAR:default}` liest den Wert aus einer Umgebungsvariable und fällt auf den
+Standardwert zurück. Spring Boot Auto-Configuration baut daraus automatisch den
+`MongoClient` und das `WarehouseRepository`.
+
+---
+
+### 6 – Kontinuierliche Speicherung (Scheduler)
+
+```java
+// WarehouseScheduler.java
+@ConditionalOnProperty(name = "warehouse.scheduler.enabled", havingValue = "true")
+public class WarehouseScheduler {
+    @Scheduled(fixedRateString = "${warehouse.scheduler.rate:30000}")
+    public void refreshStock() {
+        // jede Bestandszeile mit neuer Menge + neuem timestamp speichern
+        repository.saveAll(updatedEntries);
+    }
+}
+```
+
+`@EnableScheduling` (in `Application`) + `@Scheduled` realisieren die kontinuierliche
+Speicherung: in einem festen Intervall werden die Lagerstände aktualisiert und mit einem
+neuen Zeitstempel persistiert. Per `@ConditionalOnProperty` standardmäßig deaktiviert.
+
+---
+
+# Protokoll – Document Oriented Middleware (MongoDB)
+
+## Fragen
+
+### Nennen Sie 4 Vorteile eines NoSQL Repository gegenüber einem relationalen DBMS
+
+1. **Flexibles Schema** – Dokumente derselben Collection können unterschiedliche Felder
+   haben; Strukturänderungen erfordern keine Migration.
+2. **Horizontale Skalierbarkeit** – einfaches Sharding über mehrere Knoten, dadurch sehr
+   große Datenmengen und hoher Durchsatz.
+3. **Performance bei denormalisierten Daten** – zusammengehörige Daten liegen in einem
+   Dokument, kein teures JOIN über mehrere Tabellen notwendig.
+4. **Natürliche Abbildung von Objekten/JSON** – die Datenstruktur entspricht direkt den
+   Anwendungsobjekten (Object-Document-Mapping ohne Impedance Mismatch).
+
+### Nennen Sie 4 Nachteile eines NoSQL Repository gegenüber einem relationalen DBMS
+
+1. **Keine (bzw. eingeschränkte) ACID-Transaktionen** über mehrere Dokumente – meist nur
+   *eventual consistency*.
+2. **Datenredundanz** durch Denormalisierung – dieselbe Information (z.B. Lager-Name) wird
+   mehrfach gespeichert und muss bei Änderungen überall aktualisiert werden.
+3. **Keine standardisierte Abfragesprache** – jede Datenbank hat eine eigene API/Syntax
+   (kein universelles SQL), schwächere Ad-hoc-Joins.
+4. **Schema-Disziplin liegt bei der Applikation** – ohne erzwungenes Schema drohen
+   Inkonsistenzen, die das DBMS nicht abfängt.
+
+### Welche Schwierigkeiten ergeben sich bei der Zusammenführung der Daten?
+
+Die Daten kommen von mehreren, unabhängigen Lagerstandorten zusammen. Probleme:
+- **Uneinheitliche Bezeichner/Formate** (productID, Einheiten, Kategorienamen) müssen
+  vereinheitlicht werden.
+- **Doppelte/widersprüchliche Einträge** desselben Produkts an verschiedenen Standorten.
+- **Zeitliche Konsistenz** – Daten treffen asynchron ein; ein `timestamp` ist nötig, um
+  Stände zeitlich zuordnen zu können und keine Daten zu verlieren.
+- **Aggregation** – für betriebsweite Auswertungen muss über alle Standorte summiert werden.
+
+### Welche Arten von NoSQL Datenbanken gibt es? Nennen Sie einen Vertreter für jede Art
+
+| Art | Beschreibung | Vertreter |
+|---|---|---|
+| **Document Store** | JSON/BSON-Dokumente | **MongoDB**, CouchDB |
+| **Key-Value Store** | einfache Schlüssel-Wert-Paare | **Redis**, Amazon DynamoDB |
+| **Column-Family / Wide-Column** | spaltenorientiert | **Apache Cassandra**, HBase |
+| **Graph Database** | Knoten + Kanten (Beziehungen) | **Neo4j**, JanusGraph |
+
+### Beschreiben Sie CA, CP und AP im Bezug auf das CAP-Theorem
+
+Das CAP-Theorem besagt, dass ein verteiltes System nur **zwei** von drei Eigenschaften
+gleichzeitig garantieren kann: **C**onsistency, **A**vailability, **P**artition tolerance.
+
+- **CA** – Konsistenz + Verfügbarkeit, aber **keine** Partitionstoleranz. Funktioniert nur
+  ohne Netzwerk-Partition, z.B. ein klassisches Einzelknoten-RDBMS.
+- **CP** – Konsistenz + Partitionstoleranz, gibt bei einer Partition **Verfügbarkeit** auf
+  (Anfragen werden abgelehnt, bis Konsistenz sicher ist), z.B. MongoDB (default),
+  HBase.
+- **AP** – Verfügbarkeit + Partitionstoleranz, gibt **strikte Konsistenz** auf
+  (*eventual consistency*), z.B. Cassandra, DynamoDB.
+
+### Mit welchem Befehl können Sie den Lagerstand eines Produktes aller Lagerstandorte anzeigen?
+
+```js
+db.productData.find( { productName: "Bio Apfelsaft Gold" },
+                     { _id:0, warehouseID:1, warehouseCity:1, productQuantity:1 } )
+```
+
+Aggregiert (Gesamtbestand über alle Standorte):
+
+```js
+db.productData.aggregate([
+  { $match: { productName: "Bio Apfelsaft Gold" } },
+  { $group: { _id: "$productName", total: { $sum: "$productQuantity" } } }
+])
+// -> { _id: 'Bio Apfelsaft Gold', total: 6285 }
+```
+
+### Mit welchem Befehl können Sie den Lagerstand eines Produktes eines bestimmten Lagerstandortes anzeigen?
+
+```js
+db.productData.find( { warehouseID: "1", productName: "Ariel Waschmittel Color" },
+                     { _id:0, warehouseCity:1, productQuantity:1 } )
+// -> { warehouseCity: 'Linz', productQuantity: 519 }
+```
+
+---
+
+## 5 CRUD-Operationen über die Mongo Shell
+
+Jeweils Befehl **und** dokumentiertes Ergebnis (Collection `test.productData`).
+
+### 1) CREATE – Produkt hinzufügen
+
+```js
+db.productData.insertOne({ warehouseID:"1", warehouseName:"Linz Bahnhof", warehouseCity:"Linz",
+  productID:"05-500001", productName:"Demo Kaffee", productCategory:"Getraenk", productQuantity:120 })
+```
+```js
+{ acknowledged: true, insertedId: ObjectId('6a1eb7dd8739c589249df8a3') }
+```
+
+### 2) READ – Produkt eines Lagerstandortes lesen
+
+```js
+db.productData.find({ warehouseID:"1", productName:"Demo Kaffee" }, { _id:0 })
+```
+```js
+{ warehouseID: '1', warehouseName: 'Linz Bahnhof', warehouseCity: 'Linz',
+  productID: '05-500001', productName: 'Demo Kaffee',
+  productCategory: 'Getraenk', productQuantity: 120 }
+```
+
+### 3) UPDATE – Lagerbestand ändern
+
+```js
+db.productData.updateOne({ productID:"05-500001" }, { $set: { productQuantity: 999 } })
+```
+```js
+{ acknowledged: true, matchedCount: 1, modifiedCount: 1, upsertedCount: 0 }
+```
+
+### 4) DELETE – Produkt löschen
+
+```js
+db.productData.deleteOne({ productID:"05-500001" })
+```
+```js
+{ acknowledged: true, deletedCount: 1 }
+```
+
+### 5) COUNT – Anzahl Dokumente
+
+```js
+db.productData.countDocuments()
+```
+```js
+108
+```
+
+---
+
+## 3 Fragestellungen für das Berichtswesen
+
+### F1 – Wie hoch ist der Gesamtbestand eines Produktes über alle Lagerstandorte?
+
+```js
+db.productData.aggregate([
+  { $match: { productName: "Bio Apfelsaft Gold" } },
+  { $group: { _id: "$productName", totalStock: { $sum: "$productQuantity" } } }
+])
+// -> { _id: 'Bio Apfelsaft Gold', totalStock: 6285 }
+```
+
+### F2 – Welche Produkte haben einen kritischen Lagerbestand (≤ 100 Stück)?
+
+```js
+db.productData.find({ productQuantity: { $lte: 100 } },
+                    { _id:0, warehouseID:1, productName:1, productQuantity:1 })
+// -> { warehouseID: '3', productName: 'Bio Olivenoel Extra', productQuantity: 29 }
+```
+
+### F3 – Wie verteilt sich der Gesamtbestand auf die Produktkategorien?
+
+```js
+db.productData.aggregate([
+  { $group: { _id: "$productCategory", totalStock: { $sum: "$productQuantity" }, products: { $sum: 1 } } },
+  { $sort: { totalStock: -1 } }
+])
+// -> Tierfutter 60251 | Lebensmittel 53217 | Getraenk 52481 | Reinigung 51186 | Waschmittel 49232
+```
+
+---
+
+## Weitere Mongo-Shell-Abfragen (aus der Angabe)
+
+```js
+// Filtern nach Lagerstandort 1
+db.productData.find( { warehouseID: "1" } )
+
+// Lagerstandort 1 + bestimmtes Produkt
+db.productData.find( { warehouseID: "1", productName: "Bio Apfelsaft Gold" } )
+
+// Alle Produkte mit Bestand unter 500 Stück
+db.productData.find( { productQuantity: { $lte: 500 } } )
+
+// Lagerstandort 1 + Bestand unter 500 Stück
+db.productData.find( { warehouseID: "1", productQuantity: { $lte: 500 } } )
+
+// Produkte bestimmter Kategorien
+db.productData.find( { productCategory: { $in: [ "Waschmittel", "Getraenk" ] } } )
+```
