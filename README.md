@@ -475,17 +475,26 @@ db.productData.aggregate([
 
 ### F3 (Management) – Wie verteilt sich der Gesamtbestand auf die 6 Produktkategorien?
 
-Sortiment-Überblick für die Geschäftsführung: Bestand und Produktanzahl je Kategorie.
+Sortiment-Überblick für die Geschäftsführung: Gesamtbestand je Kategorie.
 
 ```js
 db.productData.aggregate([
   { $group: { _id: "$productCategory",
-              totalStock: { $sum: "$productQuantity" },
-              products:   { $sum: 1 } } },
+              totalStock: { $sum: "$productQuantity" } } },
   { $sort: { totalStock: -1 } }
 ])
-// -> Getraenk     619099 (250) | Drogerie  618044 (250) | Lebensmittel 614653 (250)
-//    Waschmittel  585052 (250) | Reinigung 577446 (250) | Tierfutter   577302 (250)
+// -> Getraenk     619099 | Drogerie  618044 | Lebensmittel 614653
+//    Waschmittel  585052 | Reinigung 577446 | Tierfutter   577302
+```
+
+### Zusatz – Wie viele unterschiedliche Produkte hat eine Kategorie?
+
+Zählt die *distinkten* Produkte (eindeutige `productID`) einer bestimmten
+Kategorie – unabhängig davon, an wie vielen Lagerstandorten sie geführt werden.
+
+```js
+db.productData.distinct("productID", { productCategory: "Getraenk" }).length
+// -> 50
 ```
 
 ### Zusatz – Gesamtbestand je Lagerstandort (Logistik)
