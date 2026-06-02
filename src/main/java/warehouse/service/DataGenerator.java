@@ -11,10 +11,8 @@ import warehouse.model.ProductData;
 /**
  * Generates the test data for the central repository.
  *
- * Requirement (TASK.md 1.5): at least 30 products in 5 product categories,
- * stored for several warehouse locations. The catalog below contains 36
- * distinct products across 5 categories; every product is stocked at every
- * warehouse, which results in 36 * {#warehouses} stock entries.
+ * Advanced requirement: at least
+ * 300 products in 6 product categories
  */
 @Component
 public class DataGenerator {
@@ -27,59 +25,81 @@ public class DataGenerator {
 	public record CatalogItem(String productID, String name, String category) {
 	}
 
+	/** Blueprint for one product category: id prefix + product types + variants. */
+	private record Category(String prefix, String name, String[] types, String[] variants) {
+	}
+
+	/** 5 warehouse locations (advanced requirement: "5 Warenhaeuser"). */
 	public static final List<Warehouse> WAREHOUSES = List.of(
 		new Warehouse("1", "Linz Bahnhof", "Linz"),
 		new Warehouse("2", "Wien Mitte", "Wien"),
-		new Warehouse("3", "Graz Hauptplatz", "Graz")
-	);
-
-	public static final List<CatalogItem> CATALOG = List.of(
-		// --- Getraenk (8) ---
-		new CatalogItem("00-443175", "Bio Orangensaft Sonne", "Getraenk"),
-		new CatalogItem("00-871895", "Bio Apfelsaft Gold", "Getraenk"),
-		new CatalogItem("00-112233", "Mineralwasser Still", "Getraenk"),
-		new CatalogItem("00-112244", "Mineralwasser Classic", "Getraenk"),
-		new CatalogItem("00-556677", "Cola Fresh", "Getraenk"),
-		new CatalogItem("00-667788", "Eistee Pfirsich", "Getraenk"),
-		new CatalogItem("00-778899", "Energy Drink Boost", "Getraenk"),
-		new CatalogItem("00-889900", "Bio Traubensaft Rot", "Getraenk"),
-		// --- Waschmittel (7) ---
-		new CatalogItem("01-926885", "Ariel Waschmittel Color", "Waschmittel"),
-		new CatalogItem("01-100001", "Persil Universal", "Waschmittel"),
-		new CatalogItem("01-100002", "Lenor Weichspueler", "Waschmittel"),
-		new CatalogItem("01-100003", "Vanish Oxi Action", "Waschmittel"),
-		new CatalogItem("01-100004", "Spuelmaschinen Tabs All-in-1", "Waschmittel"),
-		new CatalogItem("01-100005", "Calgon Entkalker", "Waschmittel"),
-		new CatalogItem("01-100006", "Weisser Riese Pulver", "Waschmittel"),
-		// --- Tierfutter (7) ---
-		new CatalogItem("02-234811", "Mampfi Katzenfutter Rind", "Tierfutter"),
-		new CatalogItem("02-200001", "Mampfi Hundefutter Huhn", "Tierfutter"),
-		new CatalogItem("02-200002", "Wau Trockenfutter", "Tierfutter"),
-		new CatalogItem("02-200003", "Miez Nassfutter Fisch", "Tierfutter"),
-		new CatalogItem("02-200004", "Nager Knabberstangen", "Tierfutter"),
-		new CatalogItem("02-200005", "Vogelfutter Mix", "Tierfutter"),
-		new CatalogItem("02-200006", "Aqua Fischfutter Flocken", "Tierfutter"),
-		// --- Reinigung (7) ---
-		new CatalogItem("03-893173", "Saugstauberbeutel Ingres", "Reinigung"),
-		new CatalogItem("03-300001", "Allzweckreiniger Zitrone", "Reinigung"),
-		new CatalogItem("03-300002", "Glasreiniger Klar", "Reinigung"),
-		new CatalogItem("03-300003", "WC Frisch Aktiv", "Reinigung"),
-		new CatalogItem("03-300004", "Scheuermilch Sanft", "Reinigung"),
-		new CatalogItem("03-300005", "Microfasertuch Set", "Reinigung"),
-		new CatalogItem("03-300006", "Bodenwischer Profi", "Reinigung"),
-		// --- Lebensmittel (7) ---
-		new CatalogItem("04-400001", "Spaghetti No.5", "Lebensmittel"),
-		new CatalogItem("04-400002", "Basmati Reis", "Lebensmittel"),
-		new CatalogItem("04-400003", "Bio Olivenoel Extra", "Lebensmittel"),
-		new CatalogItem("04-400004", "Tomatensauce Classico", "Lebensmittel"),
-		new CatalogItem("04-400005", "Mehl Type 405", "Lebensmittel"),
-		new CatalogItem("04-400006", "Zucker Fein", "Lebensmittel"),
-		new CatalogItem("04-400007", "Haselnuss Schokocreme", "Lebensmittel")
+		new Warehouse("3", "Graz Hauptplatz", "Graz"),
+		new Warehouse("4", "Salzburg Altstadt", "Salzburg"),
+		new Warehouse("5", "Innsbruck Zentrum", "Innsbruck")
 	);
 
 	/**
+	 * 6 product categories, each with 10 product types and 5 variants
+	 * = 50 distinct products per category = 300 products in total.
+	 */
+	private static final List<Category> CATEGORIES = List.of(
+		new Category("00", "Getraenk",
+			new String[] { "Orangensaft", "Apfelsaft", "Mineralwasser", "Cola", "Eistee",
+				"Energy Drink", "Traubensaft", "Limonade", "Tomatensaft", "Eiskaffee" },
+			new String[] { "Classic", "Zero", "Bio", "Light", "Premium" }),
+		new Category("01", "Waschmittel",
+			new String[] { "Color Waschmittel", "Universal Waschmittel", "Weichspueler",
+				"Fleckenentferner", "Spuelmaschinen Tabs", "Entkalker", "Vollwaschmittel",
+				"Feinwaschmittel", "Waschpulver", "Hygienespueler" },
+			new String[] { "Frisch", "Sensitiv", "Ultra", "Plus", "Konzentrat" }),
+		new Category("02", "Tierfutter",
+			new String[] { "Katzenfutter", "Hundefutter", "Trockenfutter", "Nassfutter",
+				"Nagerfutter", "Vogelfutter", "Fischfutter", "Pferdefutter",
+				"Kaninchenfutter", "Welpenfutter" },
+			new String[] { "Rind", "Huhn", "Fisch", "Lamm", "Gefluegel" }),
+		new Category("03", "Reinigung",
+			new String[] { "Allzweckreiniger", "Glasreiniger", "WC Reiniger", "Scheuermilch",
+				"Bodenreiniger", "Badreiniger", "Kuechenreiniger", "Edelstahlreiniger",
+				"Polsterreiniger", "Kalkreiniger" },
+			new String[] { "Zitrone", "Frisch", "Aktiv", "Sensitiv", "Power" }),
+		new Category("04", "Lebensmittel",
+			new String[] { "Spaghetti", "Basmati Reis", "Olivenoel", "Tomatensauce", "Mehl",
+				"Zucker", "Schokocreme", "Cornflakes", "Honig", "Nudeln" },
+			new String[] { "Classic", "Bio", "Fein", "Gold", "Natur" }),
+		new Category("05", "Drogerie",
+			new String[] { "Shampoo", "Duschgel", "Zahnpasta", "Handseife", "Bodylotion",
+				"Deospray", "Haarspray", "Rasierschaum", "Sonnencreme", "Feuchttuecher" },
+			new String[] { "Sensitiv", "Fresh", "Repair", "Care", "Soft" })
+	);
+
+	/** The master catalog: 300 distinct products across 6 categories. */
+	public static final List<CatalogItem> CATALOG = buildCatalog();
+
+	/**
+	 * Builds the 300-product master catalog by combining, per category, every
+	 * product type with every variant. ProductIDs follow the existing scheme
+	 * {@code "<prefix>-<6 digits>"}, e.g. {@code 00-000001}.
+	 */
+	private static List<CatalogItem> buildCatalog() {
+		List<CatalogItem> catalog = new ArrayList<>();
+		for (Category cat : CATEGORIES) {
+			int counter = 1;
+			for (String type : cat.types()) {
+				for (String variant : cat.variants()) {
+					String productID = String.format("%s-%06d", cat.prefix(), counter++);
+					String name = type + " " + variant;
+					catalog.add(new CatalogItem(productID, name, cat.name()));
+				}
+			}
+		}
+		return catalog;
+	}
+
+	/**
 	 * Builds the full set of stock entries: every catalog product at every
-	 * warehouse with a (deterministic) random quantity.
+	 * warehouse with a (deterministic) random quantity. About 5% of the entries
+	 * are intentionally below 10 units so the reporting query for critically low
+	 * stock returns meaningful results.
 	 */
 	public List<ProductData> generateAll() {
 		// fixed seed -> reproducible test data for the protocol
@@ -88,8 +108,9 @@ public class DataGenerator {
 
 		for (Warehouse wh : WAREHOUSES) {
 			for (CatalogItem item : CATALOG) {
-				// quantities between 0 and ~5000, a few intentionally low for reporting
-				int quantity = random.nextInt(5000);
+				// every ~20th entry is intentionally low (< 10) for low-stock reporting,
+				// the rest is spread between 0 and ~5000 units
+				int quantity = (random.nextInt(20) == 0) ? random.nextInt(10) : random.nextInt(5000);
 				result.add(new ProductData(
 					wh.id(), wh.name(), wh.city(),
 					item.productID(), item.name(), item.category(), quantity));

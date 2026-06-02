@@ -21,8 +21,10 @@ docker run -d -p 27017:27017 --name mongo mongo   # oder: docker start mongo
 ```
 
 Beim Start befüllt die mitgelieferte Client-Applikation das Repository automatisch über
-die REST-Schnittstelle (siehe Code-Snippet 4): **36 Produkte in 5 Kategorien** an
-**3 Lagerstandorten** = **108 Lagerbestands-Einträge**.
+die REST-Schnittstelle (siehe Code-Snippet 4). Für das Berichtswesen ("Vertiefung")
+werden **300 Produkte in 6 Kategorien** an **5 Lagerstandorten** generiert =
+**1500 Lagerbestands-Einträge** (siehe Abschnitt [Erweiterte Anforderungen – Berichtswesen
+("Vertiefung")](#erweiterte-anforderungen--berichtswesen-vertiefung)).
 
 Web-UI zur Anzeige der Daten: <http://localhost:8080/>
 
@@ -44,6 +46,41 @@ db.productData.find()
 
 ---
 
+## Basistest (Start → Test → Stop)
+
+Manuelle Schritt-für-Schritt-Anleitung für den Basistest dieses Projekts (identisch
+mit dem Block in der zentralen [`instructions.md`](../instructions.md); automatisiert
+über `../run_all.sh`). DOM und ORM nutzen beide Port **8080** – nicht gleichzeitig
+starten.
+
+```bash
+cd DEZSYS_GK_WAREHOUSE_DOM
+
+# --- MongoDB starten (Docker) ---
+docker run -d -p 27017:27017 --name dezsys_mongo mongo   # beim ersten Mal
+# docker start dezsys_mongo                               # falls schon vorhanden
+sleep 4
+
+# --- App bauen + starten (Port 8080) ---
+./gradlew clean bootJar
+java -jar build/libs/*.jar &
+# warten, bis im Log steht: "Tomcat started on port 8080" / "Started Application"
+sleep 25
+
+# --- Smoke-Check (App seedet beim Start 1500 Einträge / 5 Lager) ---
+curl http://localhost:8080/warehouse
+
+# --- App stoppen, dann MongoDB ---
+pkill -f 'build/libs'         # oder Ctrl+C im Vordergrund
+docker stop dezsys_mongo
+```
+
+> Alternative zu `bootJar` + `java -jar`: einfach `./gradlew bootRun` (Vordergrund,
+> stoppen mit Ctrl+C). Der Jar-Ansatz wird im Skript verwendet, weil er sich leichter
+> aus einem Skript heraus beenden lässt.
+
+---
+
 ## How to Use
 
 ### Datenstruktur (ein Dokument der Collection `productData`)
@@ -54,10 +91,10 @@ db.productData.find()
   "warehouseID": "1",
   "warehouseName": "Linz Bahnhof",
   "warehouseCity": "Linz",
-  "productID": "00-443175",
-  "productName": "Bio Orangensaft Sonne",
+  "productID": "00-000003",
+  "productName": "Orangensaft Bio",
   "productCategory": "Getraenk",
-  "productQuantity": 1130.0,
+  "productQuantity": 2525.0,
   "timestamp": "2026-06-02T12:58:48.288"
 }
 ```
@@ -93,7 +130,7 @@ curl http://localhost:8080/warehouse
 curl http://localhost:8080/warehouse/1
 
 # Ein Produkt über alle Lagerstandorte
-curl http://localhost:8080/product/00-443175
+curl http://localhost:8080/product/00-000003
 
 # Neues Produkt zu einem Lager hinzufügen (POST)
 curl -X POST http://localhost:8080/product \
@@ -293,7 +330,7 @@ gleichzeitig garantieren kann: **C**onsistency, **A**vailability, **P**artition 
 ### Mit welchem Befehl können Sie den Lagerstand eines Produktes aller Lagerstandorte anzeigen?
 
 ```js
-db.productData.find( { productName: "Bio Apfelsaft Gold" },
+db.productData.find( { productName: "Apfelsaft Bio" },
                      { _id:0, warehouseID:1, warehouseCity:1, productQuantity:1 } )
 ```
 
@@ -301,18 +338,18 @@ Aggregiert (Gesamtbestand über alle Standorte):
 
 ```js
 db.productData.aggregate([
-  { $match: { productName: "Bio Apfelsaft Gold" } },
+  { $match: { productName: "Apfelsaft Bio" } },
   { $group: { _id: "$productName", total: { $sum: "$productQuantity" } } }
 ])
-// -> { _id: 'Bio Apfelsaft Gold', total: 6285 }
+// -> { _id: 'Apfelsaft Bio', total: 11275 }
 ```
 
 ### Mit welchem Befehl können Sie den Lagerstand eines Produktes eines bestimmten Lagerstandortes anzeigen?
 
 ```js
-db.productData.find( { warehouseID: "1", productName: "Ariel Waschmittel Color" },
+db.productData.find( { warehouseID: "1", productName: "Color Waschmittel Frisch" },
                      { _id:0, warehouseCity:1, productQuantity:1 } )
-// -> { warehouseCity: 'Linz', productQuantity: 519 }
+// -> { warehouseCity: 'Linz', productQuantity: 1140 }
 ```
 
 ---
@@ -366,39 +403,101 @@ db.productData.deleteOne({ productID:"05-500001" })
 db.productData.countDocuments()
 ```
 ```js
-108
+1500
 ```
 
 ---
 
-## 3 Fragestellungen für das Berichtswesen
+# Erweiterte Anforderungen – Berichtswesen ("Vertiefung")
 
-### F1 – Wie hoch ist der Gesamtbestand eines Produktes über alle Lagerstandorte?
+Für ein aussagekräftiges Berichtswesen in der Zentrale wird ein deutlich größerer
+Testdatensatz benötigt. Die `DataGenerator`-Klasse (Code-Snippet 4) erzeugt dafür
+programmatisch:
+
+| Kennzahl | Wert |
+|---|---|
+| **Produkte (Katalog)** | **300** distinct Produkte |
+| **Produktkategorien** | **6** (Getraenk, Waschmittel, Tierfutter, Reinigung, Lebensmittel, Drogerie) |
+| **Lagerstandorte** | **5** (Linz, Wien, Graz, Salzburg, Innsbruck) |
+| **Lagerbestands-Einträge** | **300 × 5 = 1500** Dokumente in `productData` |
+
+Jede der 6 Kategorien steuert 50 Produkte bei (10 Produkttypen × 5 Varianten); jedes
+Produkt wird an allen 5 Lagerstandorten geführt. Etwa 5 % der Einträge werden bewusst
+mit einem Bestand unter 10 Stück generiert, damit die Nachbestell-Auswertung sinnvolle
+Treffer liefert.
+
+```js
+// Kontrolle des Datensatzes in der Mongo Shell
+db.productData.countDocuments()                  // -> 1500
+db.productData.distinct("productCategory").length // -> 6
+db.productData.distinct("warehouseID").length     // -> 5
+db.productData.distinct("productID").length       // -> 300
+```
+
+## 3 Fragestellungen für das Berichtswesen in der Zentrale
+
+### F1 (Vertrieb/Einkauf) – Wie hoch ist der Gesamtbestand eines Produktes X über *alle* Lagerstandorte?
+
+Aggregiert den Bestand eines Produktes über die 5 Standorte zu einer Gesamtsumme – die
+zentrale Frage für Disposition und Verfügbarkeitsauskunft.
 
 ```js
 db.productData.aggregate([
-  { $match: { productName: "Bio Apfelsaft Gold" } },
-  { $group: { _id: "$productName", totalStock: { $sum: "$productQuantity" } } }
+  { $match: { productName: "Apfelsaft Bio" } },
+  { $group: { _id: "$productName",
+              totalStock: { $sum: "$productQuantity" },
+              locations:  { $sum: 1 } } }
 ])
-// -> { _id: 'Bio Apfelsaft Gold', totalStock: 6285 }
+// -> { _id: 'Apfelsaft Bio', totalStock: 11275, locations: 5 }
 ```
 
-### F2 – Welche Produkte haben einen kritischen Lagerbestand (≤ 100 Stück)?
+### F2 (Einkauf) – Welche Produkte müssen nachbestellt werden (kritischer *Gesamtbestand* über alle Lager)?
 
-```js
-db.productData.find({ productQuantity: { $lte: 100 } },
-                    { _id:0, warehouseID:1, productName:1, productQuantity:1 })
-// -> { warehouseID: '3', productName: 'Bio Olivenoel Extra', productQuantity: 29 }
-```
-
-### F3 – Wie verteilt sich der Gesamtbestand auf die Produktkategorien?
+Nicht der einzelne Standort, sondern der unternehmensweite Gesamtbestand entscheidet über
+eine Nachbestellung. Hier: alle Produkte, deren Summe über alle 5 Lager unter 5000 Stück
+liegt, aufsteigend sortiert (dringendste zuerst).
 
 ```js
 db.productData.aggregate([
-  { $group: { _id: "$productCategory", totalStock: { $sum: "$productQuantity" }, products: { $sum: 1 } } },
+  { $group: { _id: { productID: "$productID", productName: "$productName" },
+              totalStock: { $sum: "$productQuantity" } } },
+  { $match: { totalStock: { $lt: 5000 } } },
+  { $sort:  { totalStock: 1 } }
+])
+// -> { _id: { productID: '03-000050', productName: 'Kalkreiniger Power' }, totalStock: 4121 }
+//    { _id: { productID: '00-000010', productName: 'Apfelsaft Premium' }, totalStock: 4705 }
+//    { _id: { productID: '04-000027', productName: 'Zucker Bio'        }, totalStock: 4932 }
+```
+
+> Variante exakt nach Beispiel-Angabe ("Lagerbestand unter 10 Stück"): einzelne
+> Lagerbestände unter 10 Stück liefern
+> `db.productData.countDocuments({ productQuantity: { $lt: 10 } })` → **78** Einträge.
+
+### F3 (Management) – Wie verteilt sich der Gesamtbestand auf die 6 Produktkategorien?
+
+Sortiment-Überblick für die Geschäftsführung: Bestand und Produktanzahl je Kategorie.
+
+```js
+db.productData.aggregate([
+  { $group: { _id: "$productCategory",
+              totalStock: { $sum: "$productQuantity" },
+              products:   { $sum: 1 } } },
   { $sort: { totalStock: -1 } }
 ])
-// -> Tierfutter 60251 | Lebensmittel 53217 | Getraenk 52481 | Reinigung 51186 | Waschmittel 49232
+// -> Getraenk     619099 (250) | Drogerie  618044 (250) | Lebensmittel 614653 (250)
+//    Waschmittel  585052 (250) | Reinigung 577446 (250) | Tierfutter   577302 (250)
+```
+
+### Zusatz – Gesamtbestand je Lagerstandort (Logistik)
+
+```js
+db.productData.aggregate([
+  { $group: { _id: { id: "$warehouseID", city: "$warehouseCity" },
+              totalStock: { $sum: "$productQuantity" },
+              products:   { $sum: 1 } } },
+  { $sort: { totalStock: -1 } }
+])
+// -> Innsbruck 751588 | Graz 736230 | Linz 716176 | Salzburg 701852 | Wien 685750
 ```
 
 ---
@@ -410,7 +509,7 @@ db.productData.aggregate([
 db.productData.find( { warehouseID: "1" } )
 
 // Lagerstandort 1 + bestimmtes Produkt
-db.productData.find( { warehouseID: "1", productName: "Bio Apfelsaft Gold" } )
+db.productData.find( { warehouseID: "1", productName: "Apfelsaft Bio" } )
 
 // Alle Produkte mit Bestand unter 500 Stück
 db.productData.find( { productQuantity: { $lte: 500 } } )
